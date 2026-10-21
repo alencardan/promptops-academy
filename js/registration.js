@@ -8,7 +8,7 @@
     const newPromptBtn = document.querySelector('#new-prompt');
     const modalCloseBtn = document.querySelector('#modal-close');
     const modalCancelBtn = document.querySelector('#modal-cancel');
-    
+
     if (!modal || !form) return;
 
     const formCategory = form.elements.categoryId;
@@ -16,18 +16,40 @@
 
     let categoriesData = [];
 
-    // Busca categorias do JSON para popular selects
-    fetch('./data/prompts.json')
-      .then(response => response.json())
-      .then(data => {
-        if (data && Array.isArray(data.categories)) {
-          categoriesData = data.categories;
+    /**
+     * Carrega categorias para o formulário.
+     * Tenta reutilizar os dados já carregados pelo catálogo para evitar
+     * uma segunda requisição a data/prompts.json. Faz fetch apenas como
+     * fallback, se os dados do catálogo ainda não estiverem disponíveis.
+     */
+    function loadCategories() {
+      // Tenta reutilizar dados do catálogo se já estiverem disponíveis
+      if (
+        global._promptOpsBaseData &&
+        Array.isArray(global._promptOpsBaseData.categories)
+      ) {
+        categoriesData = global._promptOpsBaseData.categories;
+        fillFormCategories();
+        return;
+      }
+
+      // Fallback: busca direta ao JSON
+      fetch('./data/prompts.json')
+        .then(response => response.json())
+        .then(data => {
+          if (data && Array.isArray(data.categories)) {
+            categoriesData = data.categories;
+            fillFormCategories();
+          }
+        })
+        .catch(error => {
+          console.error("Registration: Erro ao carregar categorias", error);
+          // Garante que o formulário continua funcional mesmo sem categorias
           fillFormCategories();
-        }
-      })
-      .catch(error => {
-        console.error("Registration: Erro ao carregar categorias", error);
-      });
+        });
+    }
+
+    loadCategories();
 
     function fillFormCategories() {
       const options = categoriesData.map(category => `<option value="${category.id}">${category.name}</option>`).join('');

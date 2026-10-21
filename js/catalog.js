@@ -461,6 +461,7 @@
 
     var currentData = null;
     var originalPrompts = null;
+    var originalVersions = null;
 
     // --------------------------------------------------------
     // ELEMENTOS
@@ -518,14 +519,29 @@
 
     function refreshData() {
       if (!currentData || !originalPrompts) return;
-      var persisted = (global.PromptOpsStorage && typeof global.PromptOpsStorage.getConsolidatedPrompts === "function") 
-        ? global.PromptOpsStorage.getConsolidatedPrompts(originalPrompts) 
-        : originalPrompts.slice();
-      currentData.prompts = persisted;
+
+      // Usa getConsolidatedData para obter prompts E versões persistidas
+      if (
+        global.PromptOpsStorage &&
+        typeof global.PromptOpsStorage.getConsolidatedData === "function"
+      ) {
+        var consolidated = global.PromptOpsStorage.getConsolidatedData(
+          originalPrompts,
+          originalVersions
+        );
+        currentData.prompts = consolidated.prompts;
+        currentData.versions = consolidated.versions;
+      } else {
+        currentData.prompts = originalPrompts.slice();
+      }
+
+      // Expõe refreshData no objeto público (seguro pois catalogAPI já existe)
+      if (global.PromptOpsCatalog) {
+        global.PromptOpsCatalog.refreshData = refreshData;
+      }
+
       updateCatalog();
     }
-    
-    catalogAPI.refreshData = refreshData;
 
     // --------------------------------------------------------
     // POPULA FILTROS (categorias, subcategorias, status, maturidade)
@@ -709,8 +725,13 @@
         );
 
         currentData = data;
-        originalPrompts = data.prompts.slice();
-        
+        originalPrompts = Array.isArray(data.prompts) ? data.prompts.slice() : [];
+        originalVersions = Array.isArray(data.versions) ? data.versions.slice() : [];
+
+        // Expõe os dados brutos do JSON para que outros módulos (ex: registration.js)
+        // possam reutilizá-los sem fazer uma segunda requisição ao mesmo arquivo.
+        global._promptOpsBaseData = data;
+
         refreshData();
         populateCategories(currentData);
       })
@@ -737,6 +758,9 @@
     createCard: createCard,
     filtrarPrompts: filtrarPrompts,
     limparFiltros: limparFiltros,
+    // refreshData é atribuído pela primeira vez dentro do DOMContentLoaded,
+    // após a função local ser definida. Placeholder seguro enquanto o DOM
+    // não terminou de carregar.
     refreshData: function() {}
   };
 
